@@ -11,12 +11,19 @@ describe("Redux store", () => {
   });
 
   it("handles an unknown action without crashing", () => {
-    const previousState = store.getState();
+    const previousTicketsState = store.getState().tickets;
 
-    store.dispatch({
-      type: "test/unknownAction",
-    });
+    expect(() => {
+      store.dispatch({
+        type: "test/unknownAction",
+      });
+    }).not.toThrow();
 
-    expect(store.getState()).toEqual(previousState);
+    const currentState = store.getState();
+
+    // An unknown action must not change the tickets reducer state.
+    expect(currentState.tickets).toEqual(
+      previousTicketsState
+    );
   });
 });

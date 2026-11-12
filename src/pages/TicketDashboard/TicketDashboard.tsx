@@ -28,6 +28,11 @@ import {
   selectTicketTotal,
 } from "../../features/tickets/ticketSelectors";
 
+import {
+  useBulkUpdateTicketStatusMutation,
+  useBulkAssignTicketsMutation,
+} from "../../features/tickets/ticketApi";
+
 import type {
   Ticket,
   TicketFormData,
@@ -49,6 +54,17 @@ function TicketDashboard() {
   const error = useAppSelector(selectTicketError);
   const total = useAppSelector(selectTicketTotal);
 
+  // RTK Query bulk mutations
+  const [
+    bulkUpdateTicketStatus,
+    { isLoading: isBulkStatusLoading },
+  ] = useBulkUpdateTicketStatusMutation();
+
+  const [
+    bulkAssignTickets,
+    { isLoading: isBulkAssignLoading },
+  ] = useBulkAssignTicketsMutation();
+
   // Authentication and permissions
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -56,9 +72,10 @@ function TicketDashboard() {
   const canViewAll = can("VIEW_ALL_TICKETS");
   const canViewAssigned = can("VIEW_ASSIGNED_TICKETS");
 
-  const hasViewPermission = canViewAll || canViewAssigned;
+  const hasViewPermission =
+    canViewAll || canViewAssigned;
 
-  // Search, filters and sorting
+  // Search and filters
   const [search, setSearch] = useState("");
 
   const [status, setStatus] = useState<
@@ -69,21 +86,35 @@ function TicketDashboard() {
     "All" | TicketPriority
   >("All");
 
-  const [sortBy, setSortBy] = useState<SortOption>("newest");
+  const [sortBy, setSortBy] =
+    useState<SortOption>("newest");
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 5;
 
+  // Ticket selection
+  const [selectedTicketIds, setSelectedTicketIds] =
+    useState<string[]>([]);
+
+  // Bulk action values
+  const [bulkStatus, setBulkStatus] =
+    useState<TicketStatus>("In Progress");
+
+  // Existing mock agent from authService.ts:
+  // Agent User, ID "3".
+  const [bulkAgentId, setBulkAgentId] = useState("3");
+
   // Form
   const [showForm, setShowForm] = useState(false);
 
-  const [selectedTicket, setSelectedTicket] = useState<
-    Ticket | undefined
-  >(undefined);
+  const [selectedTicket, setSelectedTicket] =
+    useState<Ticket | undefined>(undefined);
 
-  // Debounced search
   const debouncedSearch = useDebounce(search, 500);
+
+  const isBulkLoading =
+    isBulkStatusLoading || isBulkAssignLoading;
 
   // Convert UI sorting options into API parameters
   const getSortParams = useCallback((): Pick<
@@ -120,7 +151,6 @@ function TicketDashboard() {
       priority: priority === "All" ? undefined : priority,
       ...getSortParams(),
 
-      // Agents only receive their assigned tickets.
       assignedTo:
         !canViewAll && canViewAssigned
           ? user?.id
@@ -138,8 +168,7 @@ function TicketDashboard() {
     ]
   );
 
-  // Fetch tickets whenever filters, sorting,
-  // pagination or permissions change.
+  // Fetch tickets when filters or pagination change
   useEffect(() => {
     if (!user || !hasViewPermission) {
       return;
@@ -149,7 +178,6 @@ function TicketDashboard() {
       fetchTickets(buildQueryParams(currentPage))
     );
 
-    // Cancel previous request on dependency change/unmount.
     return () => {
       request.abort();
     };
@@ -179,7 +207,190 @@ function TicketDashboard() {
     total
   );
 
-  // Reset pagination when search or filters change.
+  // Refresh the current ticket list
+  function refreshTickets() {
+    dispatch(
+      fetchTickets(buildQueryParams(currentPage))
+    );
+  }
+
+  // Remove successful IDs from selection.
+  // Failed IDs remain selected for retry.
+  function updateSelectionAfterBulkAction(
+    failedIds: string[]
+  ) {
+    setSelectedTicketIds(failedIds);
+  }
+
+  // Select or unselect one ticket
+  function handleToggleSelection(
+    id: string,
+    checked: boolean
+  ) {
+    setSelectedTicketIds((previous) => {
+      if (checked) {
+        return previous.includes(id)
+          ? previous
+          : [...previous, id];
+      }
+
+      return previous.filter(
+        (ticketId) => ticketId !== id
+      );
+    });
+  }
+
+  // Select or unselect all eligible tickets on current page
+  function handleToggleAllSelection(
+    ids: string[],
+    checked: boolean
+  ) {
+    setSelectedTicketIds((previous) => {
+      if (checked) {
+        return Array.from(
+          new Set([...previous, ...ids])
+        );
+      }
+
+      return previous.filter(
+        (id) => !ids.includes(id)
+      );
+    });
+  }
+
+  function handleClearSelection() {
+    setSelectedTicketIds([]);
+  }
+
+  // Bulk status update
+  async function handleBulkStatusUpdate() {
+    if (!can("MANAGE_STATUS")) {
+      window.alert(
+        "You do not have permission to update ticket status."
+      );
+      return;
+    }
+
+    if (selectedTicketIds.length === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Change the status of ${selectedTicketIds.length} selected ticket(s) to "${bulkStatus}"?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await bulkUpdateTicketStatus({
+        ticketIds: selectedTicketIds,
+        status: bulkStatus,
+        queryArgs: buildQueryParams(currentPage),
+      }).unwrap();
+
+      const failedIds = result.failed.map(
+        (item) => item.ticketId
+      );
+
+      updateSelectionAfterBulkAction(failedIds);
+      refreshTickets();
+
+      if (result.failed.length > 0) {
+        window.alert(
+          `${result.succeeded.length} ticket(s) updated successfully.\n` +
+          `${result.failed.length} ticket(s) failed.\n\n` +
+          result.failed
+            .map(
+              (item) =>
+                `${item.ticketId}: ${item.error}`
+            )
+            .join("\n")
+        );
+      } else {
+        window.alert(
+          `${result.succeeded.length} ticket(s) updated successfully.`
+        );
+      }
+    } catch (error) {
+      console.error("Bulk status update failed:", error);
+
+      refreshTickets();
+
+      window.alert(
+        "Unable to update the selected tickets. Please try again."
+      );
+    }
+  }
+
+  // Bulk ticket assignment
+  async function handleBulkAssignment() {
+    if (!can("ASSIGN_TICKET")) {
+      window.alert(
+        "You do not have permission to assign tickets."
+      );
+      return;
+    }
+
+    if (selectedTicketIds.length === 0) {
+      return;
+    }
+
+    const agentName =
+      bulkAgentId === ""
+        ? "Unassigned"
+        : "Agent User";
+
+    const confirmed = window.confirm(
+      `Assign ${selectedTicketIds.length} selected ticket(s) to ${agentName}?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const result = await bulkAssignTickets({
+        ticketIds: selectedTicketIds,
+        agentId: bulkAgentId || null,
+      }).unwrap();
+
+      const failedIds = result.failed.map(
+        (item) => item.ticketId
+      );
+
+      updateSelectionAfterBulkAction(failedIds);
+      refreshTickets();
+
+      if (result.failed.length > 0) {
+        window.alert(
+          `${result.succeeded.length} ticket(s) assigned successfully.\n` +
+          `${result.failed.length} ticket(s) failed.\n\n` +
+          result.failed
+            .map(
+              (item) =>
+                `${item.ticketId}: ${item.error}`
+            )
+            .join("\n")
+        );
+      } else {
+        window.alert(
+          `${result.succeeded.length} ticket(s) assigned successfully.`
+        );
+      }
+    } catch (error) {
+      console.error("Bulk assignment failed:", error);
+
+      refreshTickets();
+
+      window.alert(
+        "Unable to assign the selected tickets. Please try again."
+      );
+    }
+  }
+
+  // Search and filter changes
   function handleSearchChange(value: string) {
     setSearch(value);
     setCurrentPage(1);
@@ -224,15 +435,13 @@ function TicketDashboard() {
 
       setShowForm(false);
       setSelectedTicket(undefined);
-
-      // Refresh the first page after saving.
       setCurrentPage(1);
 
-      if (currentPage === 1) {
-        dispatch(fetchTickets(buildQueryParams(1)));
-      }
+      dispatch(
+        fetchTickets(buildQueryParams(1))
+      );
     } catch {
-      // Redux stores the error and displays it below.
+      // Redux stores the error.
     }
   }
 
@@ -273,6 +482,10 @@ function TicketDashboard() {
     try {
       await dispatch(deleteTicket(id)).unwrap();
 
+      setSelectedTicketIds((previous) =>
+        previous.filter((ticketId) => ticketId !== id)
+      );
+
       const nextPage =
         tickets.length === 1 && currentPage > 1
           ? currentPage - 1
@@ -290,7 +503,6 @@ function TicketDashboard() {
     }
   }
 
-  // Cancel form
   function handleCancelForm() {
     setShowForm(false);
     setSelectedTicket(undefined);
@@ -301,8 +513,7 @@ function TicketDashboard() {
       <Header />
 
       <main className="dashboard-container">
-
-        {/* Dashboard Heading */}
+        {/* Dashboard heading */}
         <div className="dashboard-heading">
           <div>
             <h1>Customer Support Tickets</h1>
@@ -313,7 +524,8 @@ function TicketDashboard() {
 
             {user && (
               <p>
-                Logged in as: <strong>{user.name}</strong>{" "}
+                Logged in as:{" "}
+                <strong>{user.name}</strong>{" "}
                 ({user.role})
               </p>
             )}
@@ -330,7 +542,7 @@ function TicketDashboard() {
           )}
         </div>
 
-        {/* Search and Filters */}
+        {/* Search and filters */}
         <div className="filter-section">
           <SearchBar
             value={search}
@@ -377,14 +589,14 @@ function TicketDashboard() {
           </select>
         </div>
 
-        {/* Permission Message */}
+        {/* Permission message */}
         {!hasViewPermission && (
           <div className="error-message" role="alert">
             You do not have permission to view tickets.
           </div>
         )}
 
-        {/* API Error */}
+        {/* API error */}
         {error && (
           <div className="error-message" role="alert">
             {error}
@@ -398,13 +610,107 @@ function TicketDashboard() {
           </div>
         )}
 
-        {/* Ticket List */}
+        {/* Ticket list */}
         {!loading && hasViewPermission && (
           <>
             <div className="ticket-count">
               Showing {firstTicket} - {lastTicket} of{" "}
               {total} tickets
             </div>
+
+            {/* Bulk actions */}
+            {selectedTicketIds.length > 0 && (
+              <div className="bulk-actions-panel">
+                <div className="bulk-actions-header">
+                  <strong>
+                    {selectedTicketIds.length} ticket(s) selected
+                  </strong>
+
+                  <button
+                    type="button"
+                    className="bulk-clear-btn"
+                    onClick={handleClearSelection}
+                    disabled={isBulkLoading}
+                  >
+                    Clear Selection
+                  </button>
+                </div>
+
+                {can("MANAGE_STATUS") && (
+                  <div className="bulk-action-group">
+                    <label htmlFor="bulk-status">
+                      Change status
+                    </label>
+
+                    <select
+                      id="bulk-status"
+                      value={bulkStatus}
+                      onChange={(event) =>
+                        setBulkStatus(
+                          event.target.value as TicketStatus
+                        )
+                      }
+                      disabled={isBulkLoading}
+                    >
+                      <option value="Open">Open</option>
+                      <option value="In Progress">
+                        In Progress
+                      </option>
+                      <option value="Resolved">Resolved</option>
+                      <option value="Closed">Closed</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      className="bulk-action-btn"
+                      onClick={handleBulkStatusUpdate}
+                      disabled={isBulkLoading}
+                    >
+                      {isBulkStatusLoading
+                        ? "Updating..."
+                        : "Apply Status"}
+                    </button>
+                  </div>
+                )}
+
+                {can("ASSIGN_TICKET") && (
+                  <div className="bulk-action-group">
+                    <label htmlFor="bulk-agent">
+                      Assign to
+                    </label>
+
+                    <select
+                      id="bulk-agent"
+                      value={bulkAgentId}
+                      onChange={(event) =>
+                        setBulkAgentId(event.target.value)
+                      }
+                      disabled={isBulkLoading}
+                    >
+                      <option value="3">Agent User</option>
+                      <option value="">Unassigned</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      className="bulk-action-btn"
+                      onClick={handleBulkAssignment}
+                      disabled={isBulkLoading}
+                    >
+                      {isBulkAssignLoading
+                        ? "Assigning..."
+                        : "Apply Assignment"}
+                    </button>
+                  </div>
+                )}
+
+                {isBulkLoading && (
+                  <p className="bulk-loading-message">
+                    Please wait. Updating selected tickets...
+                  </p>
+                )}
+              </div>
+            )}
 
             {tickets.length === 0 ? (
               <div className="empty-message">
@@ -416,6 +722,11 @@ function TicketDashboard() {
                   tickets={tickets}
                   onEdit={handleEditTicket}
                   onDelete={handleDeleteTicket}
+                  selectedIds={selectedTicketIds}
+                  onToggleSelection={handleToggleSelection}
+                  onToggleAllSelection={
+                    handleToggleAllSelection
+                  }
                 />
 
                 <Pagination
@@ -429,7 +740,7 @@ function TicketDashboard() {
         )}
       </main>
 
-      {/* Create / Edit Modal */}
+      {/* Create / Edit modal */}
       {showForm && (
         <div className="modal-overlay">
           <div className="modal-content">
