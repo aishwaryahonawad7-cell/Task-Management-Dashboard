@@ -1,6 +1,5 @@
 
 import type { Ticket } from "../../features/tickets/ticket.types";
-
 import { usePermissions } from "../../hooks/usePermissions";
 import { useAuth } from "../../hooks/useAuth";
 
@@ -9,6 +8,13 @@ interface TicketTableProps {
   onEdit: (ticket: Ticket) => void;
   onDelete: (id: string) => void;
   onUpdateStatus?: (ticket: Ticket) => void;
+
+  selectedIds?: string[];
+  onToggleSelection?: (id: string, checked: boolean) => void;
+  onToggleAllSelection?: (
+    ids: string[],
+    checked: boolean
+  ) => void;
 }
 
 function TicketTable({
@@ -16,6 +22,9 @@ function TicketTable({
   onEdit,
   onDelete,
   onUpdateStatus,
+  selectedIds = [],
+  onToggleSelection,
+  onToggleAllSelection,
 }: TicketTableProps) {
   const { can } = usePermissions();
   const { user } = useAuth();
@@ -28,11 +37,62 @@ function TicketTable({
     );
   }
 
+  const canSelectTickets = Boolean(
+    onToggleSelection && onToggleAllSelection
+  );
+
+  // Check which tickets the current user can manage.
+  const selectableTickets = tickets.filter((ticket) => {
+    const canViewAll = can("VIEW_ALL_TICKETS");
+
+    const isAssignedToUser =
+      ticket.assignedTo === user?.id;
+
+    const canAccessTicket =
+      canViewAll ||
+      (
+        can("VIEW_ASSIGNED_TICKETS") &&
+        isAssignedToUser
+      );
+
+    return (
+      can("MANAGE_STATUS") &&
+      canAccessTicket
+    );
+  });
+
+  const allVisibleSelected =
+    selectableTickets.length > 0 &&
+    selectableTickets.every((ticket) =>
+      selectedIds.includes(ticket.id)
+    );
+
+  function handleSelectAll(checked: boolean) {
+    onToggleAllSelection?.(
+      selectableTickets.map((ticket) => ticket.id),
+      checked
+    );
+  }
+
   return (
     <div className="table-container">
       <table>
         <thead>
           <tr>
+            {canSelectTickets && (
+              <th>
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible tickets"
+                  checked={allVisibleSelected}
+                  disabled={selectableTickets.length === 0}
+                  onChange={(event) =>
+                    handleSelectAll(event.target.checked)
+                  }
+                />
+              </th>
+            )}
+
             <th>Ticket ID</th>
             <th>Customer</th>
             <th>Subject</th>
@@ -45,34 +105,51 @@ function TicketTable({
 
         <tbody>
           {tickets.map((ticket) => {
-            // Check whether the user can view all tickets.
             const canViewAll = can("VIEW_ALL_TICKETS");
 
-            // Check whether the ticket belongs to the current agent.
             const isAssignedToUser =
               ticket.assignedTo === user?.id;
 
-            // Admin/manager or assigned agent can edit,
-            // provided the permission is granted.
+            const canAccessTicket =
+              canViewAll ||
+              (
+                can("VIEW_ASSIGNED_TICKETS") &&
+                isAssignedToUser
+              );
+
             const canEdit =
               can("UPDATE_TICKET") &&
-              (canViewAll ||
-                (can("VIEW_ASSIGNED_TICKETS") &&
-                  isAssignedToUser));
+              canAccessTicket;
 
-            // Assigned agents and authorized managers
-            // can update ticket status.
             const canUpdateStatus =
               can("MANAGE_STATUS") &&
-              (canViewAll ||
-                (can("VIEW_ASSIGNED_TICKETS") &&
-                  isAssignedToUser));
+              canAccessTicket;
 
-            // Delete permission is checked separately.
-            const canDelete = can("DELETE_TICKET");
+            const canDelete =
+              can("DELETE_TICKET");
+
+            const canSelect =
+              canSelectTickets && canUpdateStatus;
 
             return (
               <tr key={ticket.id}>
+                {canSelectTickets && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ticket ${ticket.id}`}
+                      checked={selectedIds.includes(ticket.id)}
+                      disabled={!canSelect}
+                      onChange={(event) =>
+                        onToggleSelection?.(
+                          ticket.id,
+                          event.target.checked
+                        )
+                      }
+                    />
+                  </td>
+                )}
+
                 <td>{ticket.id}</td>
 
                 <td>{ticket.customerName}</td>
