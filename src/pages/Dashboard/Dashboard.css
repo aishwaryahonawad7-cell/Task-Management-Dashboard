@@ -1,0 +1,92 @@
+
+.dashboard-container {
+  min-height: 100vh;
+  background: #f5f6fa;
+  font-family: Arial, sans-serif;
+}
+
+.dashboard-header {
+  background: white;
+  padding: 18px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #ddd;
+}
+
+.dashboard-header h2 {
+  margin: 0;
+  color: #2563eb;
+}
+
+.dashboard-header button {
+  padding: 9px 18px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.dashboard-main {
+  max-width: 1100px;
+  margin: 40px auto;
+  padding: 0 20px;
+}
+
+.dashboard-main h1 {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.dashboard-main p {
+  color: #666;
+}
+
+.overview-title {
+  margin-top: 35px;
+  margin-bottom: 20px;
+  font-size: 22px;
+}
+
+.dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.dashboard-card {
+  background: white;
+  padding: 25px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+
+.dashboard-card h3 {
+  margin-top: 0;
+  color: #222;
+}
+
+.dashboard-card p {
+  margin-bottom: 20px;
+}
+
+.dashboard-card a {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.dashboard-card a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 600px) {
+  .dashboard-header {
+    padding: 15px 20px;
+  }
+
+  .dashboard-cards {
+    grid-template-columns: 1fr;
+  }
+}

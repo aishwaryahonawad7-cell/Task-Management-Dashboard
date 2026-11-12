@@ -1,0 +1,92 @@
+{
+  "tickets": [
+    {
+      "id": "TKT-1001",
+      "customerName": "Rahul Sharma",
+      "email": "rahul@gmail.com",
+      "subject": "Payment issue",
+      "description": "Payment failed during checkout.",
+      "priority": "High",
+      "status": "Open",
+      "createdAt": "2026-11-01T10:00:00.000Z",
+      "assignedTo": "3"
+    },
+    {
+      "id": "TKT-1002",
+      "customerName": "Priya Sharma",
+      "email": "priya@gmail.com",
+      "subject": "Invoice download issue",
+      "description": "Unable to download invoice.",
+      "priority": "Medium",
+      "status": "In Progress",
+      "createdAt": "2026-11-02T11:00:00.000Z",
+      "assignedTo": "3"
+    },
+    {
+      "id": "TKT-1003",
+      "customerName": "Amit Kumar",
+      "email": "amit@gmail.com",
+      "subject": "Policy document",
+      "description": "Policy document not received.",
+      "priority": "Low",
+      "status": "Resolved",
+      "createdAt": "2026-11-03T09:00:00.000Z",
+      "assignedTo": null
+    },
+    {
+      "id": "TKT-1004",
+      "customerName": "Sneha Patil",
+      "email": "sneha@gmail.com",
+      "subject": "Login problem",
+      "description": "Unable to log in to the portal.",
+      "priority": "High",
+      "status": "Open",
+      "createdAt": "2026-11-04T08:00:00.000Z",
+      "assignedTo": "4"
+    },
+    {
+      "id": "TKT-1794397648043",
+      "customerName": "Jane Doe",
+      "email": "jane@example.com",
+      "subject": "Payment issue",
+      "description": "Payment is not processing",
+      "priority": "Medium",
+      "status": "Open",
+      "assignedTo": null,
+      "createdAt": "2026-11-11T11:47:28.043Z"
+    },
+    {
+      "id": "TKT-1794397649214",
+      "customerName": "Jane Doe",
+      "email": "jane@example.com",
+      "subject": "Payment issue",
+      "description": "Payment is not processing",
+      "priority": "Medium",
+      "status": "Open",
+      "assignedTo": null,
+      "createdAt": "2026-11-11T11:47:29.214Z"
+    },
+    {
+      "id": "TKT-1794398242128",
+      "customerName": "Jane Doe",
+      "email": "jane@example.com",
+      "subject": "Payment issue",
+      "description": "Payment is not processing",
+      "priority": "Medium",
+      "status": "Open",
+      "assignedTo": null,
+      "createdAt": "2026-11-11T11:57:22.128Z"
+    },
+    {
+      "id": "TKT-1794398243275",
+      "customerName": "Jane Doe",
+      "email": "jane@example.com",
+      "subject": "Payment issue",
+      "description": "Payment is not processing",
+      "priority": "Medium",
+      "status": "Open",
+      "assignedTo": null,
+      "createdAt": "2026-11-11T11:57:23.275Z"
+    }
+  ]
+}
